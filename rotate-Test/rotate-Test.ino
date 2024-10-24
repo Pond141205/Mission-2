@@ -2,17 +2,19 @@
 #define STEP_PIN 9   // Pulse (Step) pin connected to TB6600 PUL+
 #define DIR_PIN  8   // Direction pin connected to TB6600 DIR+
 #define ENABLE_PIN 7 // Enable pin connected to TB6600 ENA+ (optional)
+#define LIMIT_SWITCH_PIN 2 // Limit switch pin detecting home position
 
 // Stepper motor parameters
 const int stepsPerRevolution = 200;  // Adjust according to your stepper motor (200 for 1.8 degree stepper)
-const int microsteps = 4;  // Set to match your TB6600 microstepping setting
+const int microsteps = 8;  // Set to match your TB6600 microstepping setting
 const float degreesPerStep = 360.0 / (stepsPerRevolution * microsteps); // Degree per step
 
 const unsigned long maxMoveTime = 10000;
 
 // Speed settings
-const int fullSpeedDelay = 1600;      // Delay in microseconds for full speed (smaller delay = faster)
-const int slowSpeedDelay = 2600;     // Delay in microseconds for slow speed (bigger delay = slower)
+const int fullSpeedDelay = 1200;      // Delay in microseconds for full speed (smaller delay = faster)
+const int slowSpeedDelay = 1600;     // Delay in microseconds for slow speed (bigger delay = slower)
+const int homeSpeedDelay = 1600;
 const float decelerationThreshold = 30.0;  // Start slowing down when within 30 degrees of target
 
 // Variables
@@ -26,6 +28,7 @@ void setup() {
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
+  pinMode(LIMIT_SWITCH_PIN, INPUT_PULLUP); // Limit switch for detecting arm
 
   // Enable the stepper driver
   digitalWrite(ENABLE_PIN, LOW); // Low to enable TB6600 (depends on your driver configuration)
@@ -33,17 +36,22 @@ void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);
   inputString.reserve(20); // Reserve some space for the input string to avoid memory fragmentation
+  
+  Serial.println("Homing stepper motor..... ");
 
-  Serial.println("Stepper motor initialized. Home angle set to 0 degree.");
-  Serial.println("Enter an angle (positive or negative) or type 'reset' to reset angle to 0:");
+  // Perform homing routine
+  homeMotor();
+
+  Serial.println(" ");
+  Serial.println("Enter an angle:");
 }
 
 void loop() {
   // Check if input is complete
   if (inputComplete) {
-    if (inputString.equalsIgnoreCase("reset")) {
+    if (inputString.equalsIgnoreCase("R")) {
       // Reset functionality
-      resetAngle();
+      homeMotor();
     } else {
       // Convert the input to an integer for angle
       int angleInput = inputString.toInt();
@@ -132,4 +140,36 @@ void rotateToAngle(int angle) {
 void resetAngle() {
   currentAngle = 0;  // Reset the current angle to 0
   Serial.println("Angle reset to 0.");
+}
+
+
+void homeMotor() {
+  // Set direction to counterclockwise (move toward limit switch)
+  digitalWrite(DIR_PIN, HIGH);
+
+  // Keep rotating until limit switch is pressed (limit switch goes LOW)
+  while (digitalRead(LIMIT_SWITCH_PIN) == HIGH) {   // counterclock wise
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(homeSpeedDelay);  // Full speed towards home
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(homeSpeedDelay);
+  }
+
+  // Once limit switch is hit, stop the motor
+  digitalWrite(STEP_PIN, LOW);
+
+  digitalWrite(DIR_PIN, LOW);
+  for (int i = 0; i < 20 ; i++){
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(homeSpeedDelay);
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(homeSpeedDelay);
+  }
+
+  currentAngle = 0;
+  Serial.println("Home position reached.");
+
+
+
+
 }
