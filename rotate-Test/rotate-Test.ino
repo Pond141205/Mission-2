@@ -8,7 +8,7 @@
 const int stepsPerRevolution = 200;  // Adjust according to your stepper motor (200 for 1.8 degree stepper)
 const int microsteps = 8;  // Set to match your TB6600 microstepping setting
 const float degreesPerStep = 360.0 / (stepsPerRevolution * microsteps); // Degree per step
-
+7445p[ ]
 const unsigned long maxMoveTime = 10000;
 
 // Speed settings
